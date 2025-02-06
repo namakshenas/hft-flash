@@ -1,5 +1,22 @@
-# hft-flash
-Shall be addressed later
+
+# High-Frequency Trading Bot
+
+This project is a high-frequency trading bot written in Node.js. The bot logs into a trading platform, retrieves market time, and places orders based on predefined start and stop times. It logs various events and responses from the broker.
+
+## Features
+
+- **Authentication**: Logs into the trading platform using credentials from environment variables.
+- **Market Time Check**: Retrieves the current market time and converts it to local time.
+- **Order Execution**: Places orders at specified intervals between start and stop times.
+- **Logging**: Logs important events and responses, including authentication success, order placement, and broker responses.
+- **Environment Validation**: Ensures all required environment variables are set.
+
+## Installation
+
+1. **Clone the repository**:
+   ```sh
+   git clone <repository-url>
+   cd <repository-directory>
 
 
 ```mermaid
