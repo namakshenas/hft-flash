@@ -11,13 +11,6 @@ This project is a high-frequency trading bot written in Node.js. The bot logs in
 - **Logging**: Logs important events and responses, including authentication success, order placement, and broker responses.
 - **Environment Validation**: Ensures all required environment variables are set.
 
-## Installation
-
-1. **Clone the repository**:
-   ```sh
-   git clone <repository-url>
-   cd <repository-directory>
-
 
 ```mermaid
 graph TB
