@@ -1,7 +1,7 @@
 
-# High-Frequency Trading Bot
+# High-Frequency Trading Bot (TSETMC)
 
-This project is a high-frequency trading bot written in Node.js. The bot logs into a trading platform, retrieves market time, and places orders based on predefined start and stop times. It logs various events and responses from the broker.
+This project is a high-frequency trading bot written in Node.js for TSETMC. The bot logs into a trading platform, retrieves market time, and places orders based on predefined start and stop times. It logs various events and responses from the broker.
 
 ## Features
 
