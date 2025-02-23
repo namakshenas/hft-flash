@@ -1,199 +1,137 @@
-import dotenv from 'dotenv';
 import axios from 'axios';
-import colors from 'colors';
+import chalk from 'chalk';
+import dotenv from 'dotenv';
+import moment from 'moment-timezone';
 import fs from 'fs';
-import stripAnsi from 'strip-ansi';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 dotenv.config();
 
-// Configure colors
-colors.setTheme({
-  info: 'green',
-  warn: 'yellow',
-  error: 'red',
-  debug: 'blue'
-});
-
-// Log storage and formatting
+// Configure logging
 const logs = [];
-const log = (level, message) => {
-  const now = new Date();
-  const datePart = now.toLocaleDateString();
-  const timePart = now.toLocaleTimeString('en-US', { hour12: false }); // Use 24-hour format to exclude AM/PM
-  const milliseconds = now.getMilliseconds().toString().padStart(3, '0');
-  const timestamp = `${datePart} ${timePart}.${milliseconds}`.yellow; // Combine date, time, and milliseconds
-  const levelStr = `[${level.toUpperCase()}]`; // Change the color of the level
-  const formatted = `${levelStr} ${timestamp} - ${message}`;
-  logs.push(stripAnsi(formatted)); // Strip ANSI codes before saving
-  console.log(formatted);
+const logger = {
+  info: (msg) => {
+    const log = `[${moment().tz('Asia/Tehran').format('HH:mm:ss.SSS')}] ${msg}`;
+    console.log(chalk.cyan(log));
+    logs.push(log);
+  },
+  success: (msg) => {
+    const log = `[${moment().tz('Asia/Tehran').format('HH:mm:ss.SSS')}] ${msg}`;
+    console.log(chalk.green(log));
+    logs.push(log);
+  },
+  error: (msg) => {
+    const log = `[${moment().tz('Asia/Tehran').format('HH:mm:ss.SSS')}] ${msg}`;
+    console.log(chalk.red(log));
+    logs.push(log);
+  }
 };
 
-// Environment validation
-const validateEnv = () => {
-  const required = [
-    'ORDER_URL', 'MARKET_TIME_URL', 'LOGIN_URL',
-    'REQUEST_INTERVAL', 'MARKET_CHECK_INTERVAL',
-    'ISIN', 'QUANTITY', 'PRICE', 'ORDER_SIDE',
-    'MAX_QUANTITY', 'MIN_TOTAL_PRICE',
-    'ORDER_START_TIME', 'ORDER_STOP_TIME',
-    'USERNAME', 'PASSWORD'
-  ];
+// Display current system time every second
+function displayCurrentTime() {
+  return setInterval(() => {
+    const currentTime = moment().tz('Asia/Tehran').format('HH:mm:ss.SSS');
+    console.log(chalk.yellow(`Current system time: ${currentTime}`));
+  }, 1000);
+}
 
-  required.forEach(varName => {
-    if (!process.env[varName]) throw new Error(`Missing ${varName} in .env`);
-  });
-
-  const totalPrice = parseInt(process.env.QUANTITY) * parseInt(process.env.PRICE);
-  if (totalPrice < parseInt(process.env.MIN_TOTAL_PRICE)) {
-    throw new Error('Total price below minimum');
-  }
+// Validate environment variables
+function validateConfig() {
+  const totalCost = parseInt(process.env.QUANTITY) * parseInt(process.env.PRICE);
+  
   if (parseInt(process.env.QUANTITY) > parseInt(process.env.MAX_QUANTITY)) {
-    throw new Error('Quantity exceeds maximum');
+    throw new Error('Quantity exceeds maximum allowed');
   }
-};
-
-// Time conversion utilities
-const parseTimeNumber = timeStr => {
-  const padded = String(timeStr).padStart(9, '0');
-  return {
-    hours: parseInt(padded.substring(0, 2)),
-    minutes: parseInt(padded.substring(2, 4)),
-    seconds: parseInt(padded.substring(4, 6)),
-    ms: parseInt(padded.substring(6, 9))
-  };
-};
-
-const getCurrentMarketTime = async () => {
-  try {
-    const response = await axios.get(process.env.MARKET_TIME_URL);
-    const timestamp = parseInt(response.data.data.time);
-    const date = new Date(timestamp);
-    // Convert to local time
-    const localTime = date.toLocaleString();
-    const localDate = new Date(localTime);
-    return {
-      hours: localDate.getHours(),
-      minutes: localDate.getMinutes(),
-      seconds: localDate.getSeconds(),
-      ms: localDate.getMilliseconds()
-    };
-  } catch (error) {
-    log('error', `Market time check failed: ${error.message}`);
-    return null;
+  
+  if (totalCost < parseInt(process.env.MIN_TOTAL_COST)) {
+    throw new Error('Total cost below minimum required');
   }
-};
+}
 
-// Main application logic
-const runApp = async () => {
-  validateEnv();
-  log('info', 'Application started');
-
-  // Login to get token
-  let authToken;
+// Authentication
+async function getAuthToken() {
   try {
-    const response = await axios.post(process.env.LOGIN_URL, {
-      username: process.env.USERNAME,
-      password: process.env.PASSWORD
+    const { data } = await axios.post(process.env.LOGIN_URL, {
+      username: process.env.USER_NAME,
+      password: process.env.PASS_WORD
     });
-    authToken = response.data.data.accessToken;
-    log('info', `Authentication successful username: ${process.env.USERNAME}`);
+    return data.data.accessToken;
   } catch (error) {
-    log('error', `Login failed: ${error.message}`);
+    throw new Error('Authentication failed');
+  }
+}
+
+// Order sending
+async function sendOrder(token) {
+  const payload = {
+    isin: process.env.ISIN,
+    quantity: parseInt(process.env.QUANTITY),
+    price: parseInt(process.env.PRICE),
+    validityType: 1,
+    validityDate: null,
+    orderSide: parseInt(process.env.ORDER_SIDE)
+  };
+
+  return axios.post(process.env.ORDER_URL, payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+// Time handling
+function parseTime(timeStr) {
+  const [h, m, s, ms] = timeStr.split('.').map(Number);
+  return moment().tz('Asia/Tehran').set({ h, m, s, ms });
+}
+
+// Main logic
+async function run() {
+  let timeDisplayIntervalId;
+  try {
+    logger.info('Starting application');
+    timeDisplayIntervalId = displayCurrentTime();
+    validateConfig();
+    
+    const token = await getAuthToken();
+    logger.success('Authenticated successfully');
+    
+    const startTime = parseTime(process.env.ORDER_START_TIME);
+    const stopTime = parseTime(process.env.ORDER_STOP_TIME);
+    const interval = parseInt(process.env.REQUEST_INTERVAL);
+
+    logger.info(`Scheduled to start at ${startTime.format('HH:mm:ss.SSS')}`);
+    // Wait until start time
+    while (moment().tz('Asia/Tehran').isBefore(startTime)) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // Send orders
+    const intervalId = setInterval(async () => {
+      if (moment().tz('Asia/Tehran').isAfter(stopTime)) {
+        clearInterval(intervalId);
+        clearInterval(timeDisplayIntervalId);
+        logger.info('Reached stop time');
+        fs.writeFileSync(`./logs/${Date.now()}.log`, logs.join('\n'));
+        process.exit(0);
+        return;
+      }
+
+      try {
+        const response = await sendOrder(token);
+        logger.success(`Order sent successfully ${JSON.stringify(response.data)}`);
+      } catch (err) {
+        logger.error(`Order failed: ${err.message}`);
+      }
+    }, interval);
+
+  } catch (err) {
+    logger.error(err.message);
+    fs.writeFileSync(`./logs/${Date.now()}_error.log`, logs.join('\n'));
+    if (timeDisplayIntervalId) {
+      clearInterval(timeDisplayIntervalId);
+    }
     process.exit(1);
   }
+}
 
-  // Time configuration
-  const startTime = parseTimeNumber(process.env.ORDER_START_TIME);
-  const stopTime = parseTimeNumber(process.env.ORDER_STOP_TIME);
-  let orderInterval;
-
-  // Log if the start time has not been reached every second
-  setInterval(async () => {
-    const current = await getCurrentMarketTime();
-    if (!current) return;
-
-    const currentTotal = current.hours * 3600 + current.minutes * 60 + current.seconds;
-    const startTotal = startTime.hours * 3600 + startTime.minutes * 60 + startTime.seconds;
-
-    if (currentTotal < startTotal) {
-      log('info', 'The start time has not been reached yet');
-    }
-  }, 1000); // Log every second
-
-  // Market time checker
-  const marketChecker = setInterval(async () => {
-    const current = await getCurrentMarketTime();
-    if (!current) return;
-
-    const currentTotal = current.hours * 3600 + current.minutes * 60 + current.seconds;
-    const startTotal = startTime.hours * 3600 + startTime.minutes * 60 + startTime.seconds;
-    const stopTotal = stopTime.hours * 3600 + stopTime.minutes * 60 + stopTime.seconds;
-
-    // Start orders
-    if (!orderInterval && currentTotal >= startTotal) {
-      log('info', 'Starting order sequence');
-      orderInterval = setInterval(sendOrder, process.env.REQUEST_INTERVAL);
-    }
-
-    // Stop orders
-    if (orderInterval && currentTotal >= stopTotal) {
-      clearInterval(orderInterval);
-      log('info', 'Order sequence stopped by STOP time');
-      saveLogs();
-      process.exit(0);
-    }
-  }, process.env.MARKET_CHECK_INTERVAL);
-
-  // Order sending function
-  let orderCounter = 0; // Initialize order counter
-
-  const sendOrder = async () => {
-    try {
-      orderCounter++; // Increment order counter
-      const orderNumber = String(orderCounter).padStart(4, '0'); // Format order number
-  
-      const payload = {
-        isin: process.env.ISIN,
-        quantity: parseInt(process.env.QUANTITY),
-        price: parseInt(process.env.PRICE),
-        validityType: 1,
-        validityDate: null,
-        orderSide: parseInt(process.env.ORDER_SIDE)
-      };
-  
-      const response = await axios.post(process.env.ORDER_URL, payload, {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-  
-      log('info', `Order #${orderNumber} sent: ${JSON.stringify(payload)}`);
-      log('info', `Broker response for Order #${orderNumber}: ${JSON.stringify(response.data)}`);
-    } catch (error) {
-      log('error', `Order #${orderNumber} failed: ${error.message}`);
-    }
-  };
-
-  // Handle process termination
-  const saveLogs = () => {
-    const logDir = join(__dirname, 'logs');
-    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
-    
-    const logFile = join(logDir, `orders_${Date.now()}.log`);
-    fs.writeFileSync(logFile, logs.join('\n'));
-    log('info', `Logs saved to ${logFile}`);
-  };
-
-  process.on('SIGINT', () => {
-    log('info', 'Process interrupted');
-    clearInterval(marketChecker);
-    if (orderInterval) clearInterval(orderInterval);
-    saveLogs();
-    process.exit(0);
-  });
-};
-
-runApp();
+// Initialize
+if (!fs.existsSync('./logs')) fs.mkdirSync('./logs');
+run();
