@@ -100,7 +100,7 @@ async function run() {
     logger.info(`Scheduled to start at ${startTime.format('HH:mm:ss.SSS')}`);
     // Wait until start time
     while (moment().tz('Asia/Tehran').isBefore(startTime)) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     // Send orders
