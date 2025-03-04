@@ -1,0 +1,17 @@
+{
+    "MO_NA": {
+      "USER_NAME": "abc",
+      "PASS_WORD": "123",
+      "REQUEST_INTERVAL": 310,
+      "ISIN": "IRO1TEST0001",
+      "QUANTITY": 123,
+      "PRICE": 12345,
+      "ORDER_SIDE": 1,
+      "ORDER_START_TIME": "08.44.56.500",
+      "ORDER_STOP_TIME": "08.45.02.123",
+      "LOGIN_URL": "https://BROKER_API/login",
+      "ORDER_URL": "https://BROKER_API/api/order",
+      "MAX_QUANTITY": 150000,
+      "MIN_TOTAL_COST": 5000000
+    }
+  }
